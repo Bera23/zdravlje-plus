@@ -1,0 +1,349 @@
+// ════════════════════════════════════════════
+// SERVICE WORKER — Pritisak Tracker
+// v2.5 | 2026-05-29 | Fix: offline response HTML page
+// ════════════════════════════════════════════
+//
+// HOW VERSIONING WORKS — no manual updates needed:
+//   On every install, the SW fetches index.html and computes a SHA-256
+//   hash of its content. That hash becomes the cache name suffix. When
+//   you push any change to index.html, the hash changes, the SW detects
+//   a new version, re-caches everything, and cleans up old caches on
+//   activate. You never touch this file manually.
+//
+// CACHE LAYOUT:
+//   pritisak-static-<hash>  — versioned app shell (index.html, manifest, icons)
+//   pritisak-fonts-v1       — stable font cache (never invalidated)
+//   pritisak-meta           — internal: stores current cache name key
+// ════════════════════════════════════════════
+
+const CACHE_FONTS    = 'pritisak-fonts-v1';  // stable — fonts don't change
+const CACHE_META     = 'pritisak-meta';      // internal bookkeeping cache
+const CACHE_PREFIX   = 'pritisak-static-';  // versioned app shell prefix
+const META_KEY       = 'current-cache';     // key inside CACHE_META
+
+// Protected caches that must never be deleted during cleanup
+const PROTECTED_CACHES = new Set([CACHE_FONTS, CACHE_META]);
+
+// ── App shell files to pre-cache on install ──
+const STATIC_ASSETS = [
+  './index.html',
+  './manifest.json',
+  './icon192.png',
+  './icon512.png',
+];
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+
+/**
+ * Fetches index.html once, computes a SHA-256 hash of its text content,
+ * and returns both the hash string and the Response object so the caller
+ * can put the response directly into cache — avoiding a second network fetch.
+ *
+ * @returns {Promise<{ hash: string, response: Response }>}
+ */
+async function fetchIndexAndHash() {
+  try {
+    const response = await fetch('./index.html', { cache: 'no-store' });
+    const text     = await response.text();
+    const buf      = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    const hex      = Array.from(new Uint8Array(buf))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    const hash = hex.slice(0, 12);
+
+    // Reconstruct a Response from text because the original body is consumed
+    const cloned = new Response(text, {
+      status:     response.status,
+      statusText: response.statusText,
+      headers:    response.headers,
+    });
+
+    return { hash, response: cloned };
+  } catch (err) {
+    // Fallback: timestamp hash so install still completes; index.html cached on next load
+    console.warn('[SW] fetchIndexAndHash failed, using timestamp fallback:', err);
+    return { hash: String(Date.now()), response: null };
+  }
+}
+
+// ════════════════════════════════════════════
+// INSTALL — hash index.html, pre-cache app shell
+// ════════════════════════════════════════════
+
+/**
+ * On install:
+ *   1. Fetch index.html + compute content hash in a single request.
+ *   2. Open versioned cache using that hash.
+ *   3. Store the pre-fetched index.html response directly (no second fetch).
+ *   4. Fetch and cache remaining static assets.
+ *   5. Persist cache name to CACHE_META for use during activate and fetch.
+ *   6. skipWaiting() to activate immediately.
+ */
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    (async () => {
+      const { hash, response: indexResponse } = await fetchIndexAndHash();
+      const cacheName = `${CACHE_PREFIX}${hash}`;
+
+      console.log(`[SW] Installing, cache: ${cacheName}`);
+
+      const cache = await caches.open(cacheName);
+
+      // Put pre-fetched index.html directly — avoids second network request
+      if (indexResponse) {
+        await cache.put('./index.html', indexResponse);
+      }
+
+      // Fetch and cache remaining assets (manifest, icons).
+      // Individual try/catch per asset — a missing icon must not abort the entire install.
+      // The app is fully functional without icons; SW must always install successfully.
+      const otherAssets = STATIC_ASSETS.filter(a => a !== './index.html');
+      await Promise.allSettled(
+        otherAssets.map(async (asset) => {
+          try {
+            await cache.add(asset);
+          } catch (err) {
+            console.warn(`[SW] Failed to cache asset: ${asset}`, err);
+            // Non-fatal — continue install without this asset
+          }
+        })
+      );
+
+      // Persist current cache name so activate and fetch handlers know what to keep/use
+      const meta = await caches.open(CACHE_META);
+      await meta.put(META_KEY, new Response(cacheName));
+
+      await self.skipWaiting();
+    })()
+  );
+});
+
+// ════════════════════════════════════════════
+// ACTIVATE — delete stale static caches
+// ════════════════════════════════════════════
+
+/**
+ * On activate:
+ *   1. Read current cache name from CACHE_META.
+ *   2. Delete all caches that start with CACHE_PREFIX and are not current.
+ *   3. Never touch PROTECTED_CACHES (fonts, meta).
+ *   4. clients.claim() to take control of open tabs immediately.
+ */
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      const meta         = await caches.open(CACHE_META);
+      const res          = await meta.match(META_KEY);
+      const currentCache = res ? await res.text() : null;
+
+      const allKeys = await caches.keys();
+      const toDelete = allKeys.filter(key =>
+        !PROTECTED_CACHES.has(key) &&          // never delete protected caches
+        key.startsWith(CACHE_PREFIX) &&         // only clean up our own caches
+        key !== currentCache                    // keep the current version
+      );
+
+      await Promise.all(toDelete.map(key => {
+        console.log(`[SW] Deleting stale cache: ${key}`);
+        return caches.delete(key);
+      }));
+
+      await self.clients.claim();
+      console.log(`[SW] Active, serving from: ${currentCache}`);
+    })()
+  );
+});
+
+// ════════════════════════════════════════════
+// FETCH — routing strategy
+// ════════════════════════════════════════════
+
+/**
+ * Routes fetch requests to the appropriate caching strategy:
+ *   - Google Fonts CSS   → stale-while-revalidate
+ *   - Google Fonts files → cache-first (handles opaque cross-origin responses)
+ *   - App shell assets   → cache-first from current versioned cache
+ *   - Everything else    → network-first with cache fallback
+ *
+ * @param {FetchEvent} event
+ */
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip non-GET and non-http(s) requests
+  if (request.method !== 'GET') return;
+  if (!url.protocol.startsWith('http')) return;
+
+  // ── Google Fonts CSS (stylesheet) ── stale-while-revalidate
+  if (url.origin === 'https://fonts.googleapis.com') {
+    event.respondWith(staleWhileRevalidate(request, CACHE_FONTS));
+    return;
+  }
+
+  // ── Google Fonts files (woff2, etc.) ── cache-first, accept opaque responses
+  if (url.origin === 'https://fonts.gstatic.com') {
+    event.respondWith(cacheFirst(request, CACHE_FONTS, true));
+    return;
+  }
+
+  // ── App shell static assets ── cache-first from versioned cache
+  if (STATIC_ASSETS.some(asset => url.pathname.endsWith(asset.replace('./', '')))) {
+    event.respondWith(cacheFirstVersioned(request));
+    return;
+  }
+
+  // ── Everything else ── network-first with cache fallback
+  event.respondWith(networkFirst(request));
+});
+
+// ════════════════════════════════════════════
+// CACHING STRATEGIES
+// ════════════════════════════════════════════
+
+/**
+ * Cache-first from the current versioned static cache.
+ * Reads cache name from CACHE_META at runtime — no hardcoded version needed.
+ *
+ * @param {Request} request
+ * @returns {Promise<Response>}
+ */
+async function cacheFirstVersioned(request) {
+  const meta         = await caches.open(CACHE_META);
+  const res          = await meta.match(META_KEY);
+  const cacheName    = res ? await res.text() : null;
+
+  if (cacheName) {
+    const cache  = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+  }
+
+  // Not in cache — fetch and store for next time
+  return fetchAndCache(request, cacheName || `${CACHE_PREFIX}fallback`, false);
+}
+
+/**
+ * Cache-first strategy for a named cache.
+ * Serves from cache if available; falls back to network and stores the response.
+ *
+ * @param {Request}  request
+ * @param {string}   cacheName
+ * @param {boolean}  allowOpaque - if true, also caches opaque cross-origin responses
+ * @returns {Promise<Response>}
+ */
+async function cacheFirst(request, cacheName, allowOpaque = false) {
+  const cache  = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  return fetchAndCache(request, cacheName, allowOpaque);
+}
+
+/**
+ * Network-first strategy with a 3-second timeout.
+ * On slow Android connections, times out and falls back to cache
+ * rather than leaving the user waiting indefinitely.
+ *
+ * @param {Request} request
+ * @returns {Promise<Response>}
+ */
+async function networkFirst(request) {
+  const meta      = await caches.open(CACHE_META);
+  const res       = await meta.match(META_KEY);
+  const cacheName = res ? await res.text() : `${CACHE_PREFIX}fallback`;
+
+  // 3-second timeout — race network fetch against a rejection timer
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('network-timeout')), 3000)
+  );
+
+  try {
+    const response = await Promise.race([fetch(request), timeout]);
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    return offlineResponse();
+  }
+}
+
+/**
+ * Stale-while-revalidate strategy.
+ * Returns cached response immediately; revalidates in background.
+ *
+ * @param {Request} request
+ * @param {string}  cacheName
+ * @returns {Promise<Response>}
+ */
+async function staleWhileRevalidate(request, cacheName) {
+  const cache  = await caches.open(cacheName);
+  const cached = await cache.match(request);
+
+  const fetchPromise = fetch(request).then(response => {
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  }).catch(() => null);
+
+  return cached || fetchPromise;
+}
+
+/**
+ * Fetches a request and stores the response in the given cache.
+ *
+ * @param {Request}  request
+ * @param {string}   cacheName
+ * @param {boolean}  allowOpaque
+ * @returns {Promise<Response>}
+ */
+async function fetchAndCache(request, cacheName, allowOpaque) {
+  try {
+    const response = await fetch(request);
+    if (response.ok || (allowOpaque && response.type === 'opaque')) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return offlineResponse();
+  }
+}
+
+/**
+ * Returns a minimal HTML 503 offline response with a user-friendly message in Serbian.
+ * Shown only if the app is opened before the first successful cache (rare edge case).
+ *
+ * @returns {Response}
+ */
+function offlineResponse() {
+  const html = `<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f0f11">
+<title>Zdravlje+ — Offline</title>
+<style>
+  body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f0f11; color: #e8e8ec; font-family: 'Courier New', Courier, monospace; text-align: center; padding: 24px; }
+  .icon { font-size: 3rem; margin-bottom: 16px; }
+  h1 { font-size: 1.1rem; font-weight: 500; margin-bottom: 8px; }
+  p { font-size: 0.8rem; color: #7a7a88; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="icon">📵</div>
+  <h1>Nema internet veze</h1>
+  <p>Povežite se na internet i<br>ponovo otvorite aplikaciju.</p>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 503,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
+}
