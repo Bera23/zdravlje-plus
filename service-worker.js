@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════
 // SERVICE WORKER — Pritisak Tracker
-// v2.5 | 2026-05-29 | Fix: offline response HTML page
+// v2.6 | 2026-05-31 | Feat: postMessage SW_UPDATED to clients on activate for auto-reload
 // ════════════════════════════════════════════
 //
 // HOW VERSIONING WORKS — no manual updates needed:
@@ -152,6 +152,14 @@ self.addEventListener('activate', (event) => {
 
       await self.clients.claim();
       console.log(`[SW] Active, serving from: ${currentCache}`);
+
+      // Notify all open clients that a new version is active so they can reload.
+      // This triggers location.reload() in index.html, ensuring users always
+      // run the latest version without manually clearing cache.
+      const allClients = await self.clients.matchAll({ type: 'window' });
+      for (const client of allClients) {
+        client.postMessage({ type: 'SW_UPDATED' });
+      }
     })()
   );
 });
