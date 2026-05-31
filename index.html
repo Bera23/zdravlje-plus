@@ -1,4 +1,4 @@
-<!-- v2.10 | 2026-05-29 | Fix: toggleMed per-medId Set lock instead of global boolean -->
+<!-- v2.13 | 2026-05-31 | Fix: ekavica, dead CSS var, formatDayHeader top-level, getTakenForMonth optimization -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -78,7 +78,6 @@
 
     /* Input focus ring */
     --focus-ring: rgba(224,92,92,0.18);
-    --focus-ring2: rgba(240,160,96,0.18);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -436,6 +435,22 @@
 
   .btn-del-med:active { color: var(--accent); }
 
+  /* Stock adjustment buttons (–1 / +1) */
+  .btn-stock-adj {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xxs);
+    color: var(--muted);
+    font-family: 'DM Mono', 'Courier New', Courier, monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 5px 9px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .btn-stock-adj:active { border-color: var(--accent2); color: var(--accent2); }
+
   /* stock bar */
   .form-row-grid .form-row { margin-bottom: 0; }
 
@@ -518,10 +533,49 @@
   }
 
   /* ── HISTORY TAB ── */
+
+  /* Month navigation bar */
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+
+  .month-nav-label {
+    font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+    font-size: 1.1rem;
+    font-weight: 300;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+
+  .month-nav-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--text);
+    font-size: 1rem;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .month-nav-btn:active { border-color: var(--accent); color: var(--accent); }
+
+  /* Filter row */
   .hist-filter-row {
     display: flex;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     align-items: center;
   }
 
@@ -539,20 +593,40 @@
     -webkit-appearance: none;
   }
 
-  .hist-count { font-size: 0.65rem; color: var(--muted); margin-bottom: 10px; }
+  .hist-count { font-size: 0.65rem; color: var(--muted); margin-bottom: 12px; }
 
-  .entry {
+  /* Day group card — wraps all entries for one day */
+  .day-group {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .day-group-header {
+    padding: 12px 16px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  /* Entry inside day group — no card background, separator between entries */
+  .entry {
+    padding: 14px 16px;
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
     gap: 8px;
-    animation: fadeIn 0.2s ease;
+    border-bottom: 1px solid var(--border);
   }
+
+  .entry:last-child { border-bottom: none; }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
@@ -763,6 +837,14 @@
 ══════════════════════════════ -->
 <div id="tab-istorija" class="tab-panel">
 
+  <!-- Month navigation -->
+  <div class="month-nav">
+    <button class="month-nav-btn" onclick="shiftMonth(-1)" aria-label="Prethodni mesec">&#8249;</button>
+    <span class="month-nav-label" id="month-nav-label"></span>
+    <button class="month-nav-btn" onclick="shiftMonth(+1)" aria-label="Sledeci mesec">&#8250;</button>
+  </div>
+
+  <!-- Date filter -->
   <div class="hist-filter-row">
     <input type="date" id="filter-date" onchange="renderHistory()" autocomplete="off">
     <button class="btn-secondary" onclick="clearHistFilter()">Sve</button>
@@ -772,7 +854,7 @@
   <div id="history-list"></div>
 
   <div class="export-row">
-    <button class="btn-secondary" onclick="exportCSV()">↓ CSV izvoz</button>
+    <button class="btn-secondary" onclick="exportCSV()">&#8595; CSV izvoz</button>
   </div>
 </div>
 
@@ -811,6 +893,19 @@
 
   /** Validation bounds (fixed — do not change) */
   const VALID = { sysMin: 60, sysMax: 300, diaMin: 40, diaMax: 200, pulseMin: 30, pulseMax: 250 };
+
+  /** Serbian month names (nominative) */
+  const SR_MONTHS = [
+    'Januar','Februar','Mart','April','Maj','Jun',
+    'Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'
+  ];
+
+  /**
+   * Currently displayed month/year in Istorija tab.
+   * Initialized to current month in appInit().
+   * { year: number, month: number (0-based) }
+   */
+  let histViewMonth = { year: 0, month: 0 };
 
   // ════════════════════════════
   // 2. INDEXEDDB INIT
@@ -1042,7 +1137,7 @@
   /**
    * Gets all taken records, grouped by date.
    * Returns Map<"YYYY-MM-DD", Map<medId, boolean>>.
-   * Used by history and CSV export.
+   * Used by CSV export (needs all data).
    * @returns {Promise<Map<string, Map<number, boolean>>>}
    */
   async function getAllTakenGrouped() {
@@ -1056,6 +1151,33 @@
       return grouped;
     } catch (err) {
       console.error('[DB] getAllTakenGrouped() failed:', err);
+      return new Map();
+    }
+  }
+
+  /**
+   * Gets taken records grouped by date, filtered to a specific year/month.
+   * More efficient than getAllTakenGrouped() for single-month rendering.
+   * Returns Map<"YYYY-MM-DD", Map<medId, boolean>>.
+   * @param {number} year
+   * @param {number} month - 0-based (0=January)
+   * @returns {Promise<Map<string, Map<number, boolean>>>}
+   */
+  async function getTakenForMonth(year, month) {
+    try {
+      // Build date range prefix: "YYYY-MM-" to filter by month without a full table scan
+      const mm     = String(month + 1).padStart(2, '0');
+      const prefix = `${year}-${mm}-`;
+      const all    = await dbGetAll(STORE_TAKEN);
+      const grouped = new Map();
+      for (const r of all) {
+        if (!r.date.startsWith(prefix)) continue;
+        if (!grouped.has(r.date)) grouped.set(r.date, new Map());
+        grouped.get(r.date).set(r.medId, r.taken);
+      }
+      return grouped;
+    } catch (err) {
+      console.error(`[DB] getTakenForMonth(${year}, ${month}) failed:`, err);
       return new Map();
     }
   }
@@ -1244,6 +1366,9 @@
               </div>
               <div class="med-card-actions">
                 ${m.qty ? `<button class="btn-refill" onclick="refillMed(${m.id})">+ Kutija</button>` : ''}
+                ${m.stock !== null ? `
+                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, -1)">–1</button>
+                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, +1)">+1</button>` : ''}
                 <button class="btn-del-med" onclick="deleteMed(${m.id})">✕</button>
               </div>
             </div>
@@ -1257,18 +1382,68 @@
   }
 
   /**
-   * Renders the history tab with all BP entries and their med status pills.
-   * Applies date filter if selected.
+   * Updates the month navigation label text (e.g. "Maj 2026").
+   */
+  function updateMonthNavLabel() {
+    const label = document.getElementById('month-nav-label');
+    if (label) {
+      label.textContent = `${SR_MONTHS[histViewMonth.month]} ${histViewMonth.year}`;
+    }
+  }
+
+  /**
+   * Shifts the viewed month by delta (-1 = previous, +1 = next).
+   * Clears the date filter and re-renders history.
+   * @param {number} delta
+   */
+  function shiftMonth(delta) {
+    let { year, month } = histViewMonth;
+    month += delta;
+    if (month < 0)  { month = 11; year -= 1; }
+    if (month > 11) { month = 0;  year += 1; }
+    histViewMonth = { year, month };
+    // Clear date filter when navigating months — filter applies within current month only
+    document.getElementById('filter-date').value = '';
+    updateMonthNavLabel();
+    renderHistory();
+  }
+
+  /**
+   * Formats a "YYYY-MM-DD" string to a localized Serbian day header.
+   * Uses noon (T12:00:00) to avoid DST edge cases where midnight can shift the date.
+   * e.g. "2026-05-31" → "31. maj 2026, subota"
+   * @param {string} dateStr - "YYYY-MM-DD"
+   * @returns {string}
+   */
+  function formatDayHeader(dateStr) {
+    const d    = new Date(dateStr + 'T12:00:00');
+    const days = ['Nedelja','Ponedeljak','Utorak','Sreda','Četvrtak','Petak','Subota'];
+    return `${d.getDate()}. ${SR_MONTHS[d.getMonth()].toLowerCase()} ${d.getFullYear()}, ${days[d.getDay()].toLowerCase()}`;
+  }
+
+  /**
+   * Renders the history tab grouped by day for the currently viewed month.
+   * If a date filter is active, shows only that day (filter must be within the viewed month).
+   * Groups entries into day-block cards; entries within a day are separated by a border.
    */
   async function renderHistory() {
     const list = document.getElementById('history-list');
     list.innerHTML = '<div class="db-loading">Učitavanje…</div>';
 
+    updateMonthNavLabel();
+
     try {
       const filterDate = document.getElementById('filter-date').value;
-      // Use IDB ts-index cursor — returns newest-first without JS sort
+      // Load all entries sorted newest-first via IDB ts-index cursor
       let entries = await getMeasurementsSortedDesc();
 
+      // Filter to the currently viewed month
+      entries = entries.filter(e => {
+        const d = new Date(e.ts);
+        return d.getFullYear() === histViewMonth.year && d.getMonth() === histViewMonth.month;
+      });
+
+      // If a specific date filter is active, narrow to that day only
       if (filterDate) {
         entries = entries.filter(e => localDateOf(e.ts) === filterDate);
       }
@@ -1280,42 +1455,64 @@
         return;
       }
 
-      const meds        = await dbGetAll(STORE_MEDICATIONS);
-      const allTaken    = await getAllTakenGrouped();
+      const meds     = await dbGetAll(STORE_MEDICATIONS);
+      // Load taken records only for the viewed month — avoids full table scan
+      const allTaken = await getTakenForMonth(histViewMonth.year, histViewMonth.month);
 
-      list.innerHTML = entries.map(e => {
-        const cat      = classify(e.sys, e.dia);
-        const sc       = `sys-${cat.cls}`;
-        const dateKey  = localDateOf(e.ts);
+      // Group entries by local date string "YYYY-MM-DD", preserving newest-first order
+      const groups = new Map(); // Map<dateStr, entry[]>
+      for (const e of entries) {
+        const key = localDateOf(e.ts);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(e);
+      }
+
+      // Build HTML — one .day-group card per date
+      list.innerHTML = [...groups.entries()].map(([dateKey, dayEntries]) => {
         const dayTaken = allTaken.get(dateKey) || new Map();
 
-        // Build med pills for this day
-        const medPills = meds.length
-          ? meds.map(m => {
-              const ok = !!dayTaken.get(m.id);
-              return `<span class="med-pill ${ok ? 'ok' : 'nok'}">${ok ? '✓' : '✗'} ${escHtml(m.name)}</span>`;
-            }).join('')
-          : '';
+        const entriesHtml = dayEntries.map(e => {
+          const cat      = classify(e.sys, e.dia);
+          const sc       = `sys-${cat.cls}`;
+          const medPills = meds.length
+            ? meds.map(m => {
+                const ok = !!dayTaken.get(m.id);
+                return `<span class="med-pill ${ok ? 'ok' : 'nok'}">${ok ? '✓' : '✗'} ${escHtml(m.name)}</span>`;
+              }).join('')
+            : '';
+
+          // Show only time (HH:MM) inside a day group — date is in the header
+          const dt = new Date(e.ts);
+          const hh = String(dt.getHours()).padStart(2, '0');
+          const mi = String(dt.getMinutes()).padStart(2, '0');
+
+          return `
+            <div class="entry">
+              <div>
+                <div class="entry-values">
+                  <span class="val-sys ${sc}">${e.sys}</span>
+                  <span class="val-sep">/</span>
+                  <span class="val-dia ${sc}">${e.dia}</span>
+                  <span class="val-pulse">♥ ${e.pulse}</span>
+                </div>
+                <div class="entry-time">${hh}:${mi}</div>
+                ${e.note ? `<div class="entry-note">${escHtml(e.note)}</div>` : ''}
+                ${medPills ? `<div class="entry-meds">${medPills}</div>` : ''}
+              </div>
+              <div class="entry-right">
+                <span class="badge badge-${cat.cls}">${cat.label}</span>
+                <button class="btn-del-entry" onclick="deleteEntry(${e.id})">✕</button>
+              </div>
+            </div>`;
+        }).join('');
 
         return `
-          <div class="entry">
-            <div>
-              <div class="entry-values">
-                <span class="val-sys ${sc}">${e.sys}</span>
-                <span class="val-sep">/</span>
-                <span class="val-dia ${sc}">${e.dia}</span>
-                <span class="val-pulse">♥ ${e.pulse}</span>
-              </div>
-              <div class="entry-time">${fmtTs(e.ts)}</div>
-              ${e.note ? `<div class="entry-note">${escHtml(e.note)}</div>` : ''}
-              ${medPills ? `<div class="entry-meds">${medPills}</div>` : ''}
-            </div>
-            <div class="entry-right">
-              <span class="badge badge-${cat.cls}">${cat.label}</span>
-              <button class="btn-del-entry" onclick="deleteEntry(${e.id})">✕</button>
-            </div>
+          <div class="day-group">
+            <div class="day-group-header">${formatDayHeader(dateKey)}</div>
+            ${entriesHtml}
           </div>`;
       }).join('');
+
     } catch (err) {
       console.error('[renderHistory] Error:', err);
       document.getElementById('count-label').textContent = '';
@@ -1420,6 +1617,9 @@
     }
   }
 
+  /**
+   * Clears the active date filter and re-renders history for the full viewed month.
+   */
   function clearHistFilter() {
     document.getElementById('filter-date').value = '';
     renderHistory();
@@ -1530,9 +1730,33 @@
   }
 
   /**
-   * Deletes a medication and all its associated taken records.
+   * Adjusts medication stock by a given delta (+1 or -1).
+   * Clamps to 0 on the lower end; no upper bound enforced.
    * @param {number} medId
+   * @param {number} delta - positive or negative integer
    */
+  async function adjustStock(medId, delta) {
+    try {
+      const med = await dbGet(STORE_MEDICATIONS, medId);
+      if (!med || med.stock === null) return;
+
+      med.stock = Math.max(0, med.stock + delta);
+      await dbPut(STORE_MEDICATIONS, med);
+
+      // Warn on low stock after manual decrease
+      if (delta < 0 && med.stock <= 5) {
+        showToast(`⚠ ${med.name} — ostalo ${med.stock} kom`, true);
+      }
+
+      renderMeds();
+      renderTodayMeds();
+    } catch (err) {
+      console.error('[adjustStock] Error:', err);
+      showToast('Greška pri korekciji zaliha!', true);
+    }
+  }
+
+
   async function deleteMed(medId) {
     if (!confirm('Obrisati lek?')) return;
     try {
@@ -1687,6 +1911,10 @@
       document.getElementById('history-list').innerHTML    = errHtml;
       return;
     }
+
+    // Initialize history view to current month
+    const now = new Date();
+    histViewMonth = { year: now.getFullYear(), month: now.getMonth() };
 
     setDateTimeDefaults();
     await renderTodayMeds();
