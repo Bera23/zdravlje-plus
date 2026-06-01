@@ -1,4 +1,4 @@
-<!-- v2.15 | 2026-05-31 | Fix: remove dead fmtTs, add deleteMed JSDoc -->
+<!-- v2.16 | 2026-06-01 | Rename: Zdravlje+ → Srce & Pritisak, new app icon -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Pritisak — Dnevnik</title>
+<title>Srce & Pritisak — Dnevnik</title>
 <meta name="description" content="Lični dnevnik krvnog pritiska i lekova">
 <meta name="theme-color" content="#0f0f11" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f0eff4" media="(prefers-color-scheme: light)">
@@ -741,7 +741,7 @@
 <body>
 
 <div class="top-header">
-  <h1>Zdravlje <span>+</span></h1>
+  <h1>Srce <span>&amp;</span> Pritisak</h1>
 </div>
 
 <!-- ══════════════════════════════
@@ -1797,12 +1797,12 @@
 
       // navigator.share() is preferred on Android TWA — a.click() is unreliable in TWA context.
       // Falls back to anchor download for desktop browsers that don't support share API.
-      const filename = `zdravlje_${todayStr()}.csv`;
+      const filename = `srce_pritisak_${todayStr()}.csv`;
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'text/csv' })] })) {
         try {
           await navigator.share({
             files: [new File([blob], filename, { type: 'text/csv' })],
-            title: 'Zdravlje+ izvoz podataka',
+            title: 'Srce & Pritisak — izvoz podataka',
           });
           return;
         } catch (shareErr) {
