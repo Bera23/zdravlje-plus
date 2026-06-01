@@ -1,4 +1,4 @@
-<!-- v2.16 | 2026-06-01 | Rename: Zdravlje+ → Srce & Pritisak, new app icon -->
+<!-- v2.19 | 2026-06-01 | Fix: hardcoded color → var(--toast-err-fg), remove dead .med-check-list CSS -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -311,8 +311,6 @@
   .btn-secondary:active { border-color: var(--accent2); color: var(--accent2); }
 
   /* ── TODAY MEDS ── */
-  .med-check-list { display: flex; flex-direction: column; gap: 10px; }
-
   .med-check-item {
     display: flex;
     align-items: center;
@@ -370,13 +368,30 @@
     text-align: center;
     color: var(--muted);
     font-size: 0.78rem;
-    padding: 28px 0;
+    padding: 20px 0;
   }
 
-  .today-empty a {
+  .today-empty p {
+    margin-bottom: 14px;
+  }
+
+  .btn-add-med-empty {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    border-radius: var(--radius-sm);
     color: var(--accent2);
-    text-decoration: underline;
+    font-family: 'DM Mono', 'Courier New', Courier, monospace;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    padding: 12px 24px;
     cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .btn-add-med-empty:active {
+    background: var(--accent2);
+    color: var(--toast-err-fg);
   }
 
   /* ── MEDS TAB ── */
@@ -407,7 +422,30 @@
     margin-top: 3px;
   }
 
-  .med-card-actions { display: flex; gap: 8px; align-items: center; }
+  .med-card-actions { display: flex; align-items: center; }
+
+  .med-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .med-card-footer .btn-refill { flex-shrink: 0; }
+
+  .med-stock-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .stock-count-display {
+    font-size: 0.75rem;
+    color: var(--muted);
+    min-width: 32px;
+    text-align: center;
+  }
 
   .btn-refill {
     background: var(--pill-ok-bg);
@@ -1284,7 +1322,7 @@
       const todayMap = await getTakenForDate(todayStr());
 
       if (!meds.length) {
-        el.innerHTML = `<div class="today-empty">Nema lekova. <a onclick="switchTab('lekovi')">Dodaj lek →</a></div>`;
+        el.innerHTML = `<div class="today-empty"><p>Nema lekova.</p><button class="btn-add-med-empty" onclick="switchTab('lekovi')">+ Dodaj lek</button></div>`;
         return;
       }
 
@@ -1351,14 +1389,20 @@
                 ${meta ? `<div class="med-card-meta">${meta}</div>` : ''}
               </div>
               <div class="med-card-actions">
-                ${m.qty ? `<button class="btn-refill" onclick="refillMed(${m.id})">+ Kutija</button>` : ''}
-                ${m.stock !== null ? `
-                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, -1)">–1</button>
-                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, +1)">+1</button>` : ''}
                 <button class="btn-del-med" onclick="deleteMed(${m.id})">✕</button>
               </div>
             </div>
             ${stockHtml}
+            ${(m.qty || m.stock !== null) ? `
+            <div class="med-card-footer">
+              ${m.qty ? `<button class="btn-refill" onclick="refillMed(${m.id})">+ Kutija</button>` : ''}
+              ${m.stock !== null ? `
+              <div class="med-stock-controls">
+                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, -1)">–1</button>
+                <span class="stock-count-display">${m.stock !== null ? m.stock : '—'}</span>
+                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, +1)">+1</button>
+              </div>` : ''}
+            </div>` : ''}
           </div>`;
       }).join('');
     } catch (err) {
