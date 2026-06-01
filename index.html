@@ -1,4 +1,4 @@
-<!-- v2.29 | 2026-06-01 | Feat: Podešavanja tab — statistike, PDF izvoz, brisanje podataka, o aplikaciji; uklonjen CSV izvoz -->
+<!-- v2.30 | 2026-06-01 | Feat: kartica poslednjeg merenja na Danas tabu; uklonjen mrtav @media print blok -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -767,6 +767,59 @@
     font-size: 0.78rem; padding: 36px 0; letter-spacing: 0.05em;
   }
 
+  /* ── LAST READING CARD (Danas tab) ── */
+
+  .last-reading-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .last-reading-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .last-reading-values {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  /* Reuse existing val-* classes for numbers — consistent with history entries */
+
+  .last-reading-meta {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  .last-reading-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .last-reading-empty {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 6px 0;
+  }
+
   /* ── SETTINGS TAB ── */
 
   .settings-section {
@@ -989,19 +1042,6 @@
   }
 
   .btn-confirm-ok:active { opacity: 0.85; }
-  @media print {
-    body * { visibility: hidden; }
-    #print-area, #print-area * { visibility: visible; }
-    #print-area {
-      position: fixed;
-      inset: 0;
-      background: #ffffff;
-      color: #111111;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 11pt;
-      padding: 20mm 15mm;
-    }
-  }
 
   /* ── DB LOADING STATE ── */
   .db-loading {
@@ -1186,6 +1226,9 @@
 ══════════════════════════════ -->
 <div id="tab-danas" class="tab-panel active">
 
+  <!-- Last reading summary -->
+  <div id="last-reading"></div>
+
   <!-- Today's meds -->
   <div class="card">
     <div class="card-title">Lekovi danas</div>
@@ -1325,7 +1368,7 @@
       <div class="about-hero-icon">❤️</div>
       <div class="about-hero-name">Srce <span class="about-hero-amp">&amp;</span> Pritisak</div>
       <div class="about-hero-desc">Lični dnevnik krvnog pritiska i lekova</div>
-      <span class="about-version-badge">v2.29</span>
+      <span class="about-version-badge">v2.30</span>
     </div>
     <p class="about-disclaimer">
       Ova aplikacija nije medicinski uređaj i ne zamenjuje savet lekara.
@@ -1810,6 +1853,70 @@
   }
 
   /**
+   * Renders the "Poslednje merenje" summary card on the Danas tab.
+   * Fetches the single most recent measurement via the ts-index cursor
+   * (getMeasurementsSortedDesc already does this; we reuse it but only
+   * need the first record, so we limit the read).
+   * Shows sys/dia/pulse values, badge, and relative time ("pre X sati / juče / DD.MM.").
+   */
+  async function renderLastReading() {
+    const el = document.getElementById('last-reading');
+    if (!el) return;
+
+    try {
+      // Reuse existing sorted-desc function — we only need the first record
+      const all = await getMeasurementsSortedDesc();
+
+      if (!all.length) {
+        el.innerHTML = ''; // no measurements yet — hide the card entirely
+        return;
+      }
+
+      const e   = all[0];
+      const cat = classify(e.sys, e.dia);
+      const sc  = `sys-${cat.cls}`;
+      const dt  = new Date(e.ts);
+
+      // Build relative time label
+      const now       = new Date();
+      const diffMs    = now - dt;
+      const diffMins  = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays  = Math.floor(diffMs / 86400000);
+
+      let timeLabel;
+      if (diffMins < 60)        timeLabel = `pre ${diffMins} min`;
+      else if (diffHours < 24)  timeLabel = `pre ${diffHours} h`;
+      else if (diffDays === 1)  timeLabel = 'juče';
+      else {
+        const dd = String(dt.getDate()).padStart(2, '0');
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        timeLabel = `${dd}.${mm}.`;
+      }
+
+      el.innerHTML = `
+        <div class="last-reading-card">
+          <div>
+            <div class="last-reading-label">Poslednje merenje</div>
+            <div class="last-reading-values">
+              <span class="val-sys ${sc}">${e.sys}</span>
+              <span class="val-sep">/</span>
+              <span class="val-dia ${sc}">${e.dia}</span>
+              <span class="val-pulse">♥ ${e.pulse}</span>
+            </div>
+            <div class="last-reading-meta">${timeLabel}${e.note ? ` · ${escHtml(e.note)}` : ''}</div>
+          </div>
+          <div class="last-reading-right">
+            <span class="badge badge-${cat.cls}" onclick="showBpModal('${cat.cls}')" role="button" aria-label="Objašnjenje kategorije ${cat.label}">${cat.label}</span>
+          </div>
+        </div>`;
+    } catch (err) {
+      console.error('[renderLastReading] Error:', err);
+      el.innerHTML = ''; // silent fail — card simply doesn't appear
+    }
+  }
+
+  /**
    * Renders the "Lekovi danas" section with today's med checkboxes.
    * Reads medications and today's taken records from IndexedDB.
    */
@@ -2080,7 +2187,7 @@
     });
     // Persist active tab so refresh restores the same view
     sessionStorage.setItem('activeTab', name);
-    if (name === 'danas')       renderTodayMeds();
+    if (name === 'danas')       { renderLastReading(); renderTodayMeds(); }
     if (name === 'lekovi')      renderMeds();
     if (name === 'istorija')    renderHistory();
     if (name === 'podesavanja') renderSettings();
@@ -2141,6 +2248,7 @@
         document.getElementById(id).value = '';
       });
       setDateTimeDefaults();
+      renderLastReading(); // update the summary card immediately after save
       showToast('Merenje sačuvano ✓');
     } catch (err) {
       console.error('[saveEntry] Error:', err);
@@ -2569,7 +2677,7 @@
       setDateTimeDefaults();
       // Only re-render today meds if "Danas" tab is active — avoids unnecessary DB reads
       const danasActive = document.getElementById('tab-danas').classList.contains('active');
-      if (danasActive) renderTodayMeds();
+      if (danasActive) { renderLastReading(); renderTodayMeds(); }
     }
   });
 
@@ -2687,7 +2795,7 @@
     }
 
     // Render the active tab
-    if (savedTab === 'danas')       await renderTodayMeds();
+    if (savedTab === 'danas')       { await renderLastReading(); await renderTodayMeds(); }
     if (savedTab === 'lekovi')      renderMeds();
     if (savedTab === 'istorija')    renderHistory();
     if (savedTab === 'podesavanja') renderSettings();
