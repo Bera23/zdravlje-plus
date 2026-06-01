@@ -1,4 +1,4 @@
-<!-- v2.28 | 2026-06-01 | A11y: minimum font-size audit — all text raised to ≥0.7rem (11.2px) -->
+<!-- v2.29 | 2026-06-01 | Feat: Podešavanja tab — statistike, PDF izvoz, brisanje podataka, o aplikaciji; uklonjen CSV izvoz -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -767,7 +767,241 @@
     font-size: 0.78rem; padding: 36px 0; letter-spacing: 0.05em;
   }
 
-  .export-row { margin-top: 16px; text-align: right; }
+  /* ── SETTINGS TAB ── */
+
+  .settings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 16px;
+    margin-bottom: 14px;
+  }
+
+  .settings-section-title {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  /* Stat row — label + value side by side */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-row:last-child { border-bottom: none; }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Danger buttons — use accent color (red), consistent with existing palette */
+  .btn-danger {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-family: 'DM Mono', 'Courier New', Courier, monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 14px 16px;
+    cursor: pointer;
+    text-align: left;
+    margin-bottom: 10px;
+  }
+
+  .btn-danger:last-child { margin-bottom: 0; }
+
+  .btn-danger:active {
+    background: var(--badge-crisis-bg);
+  }
+
+  /* "Sačuvaj kao PDF" — styled like btn-primary but uses accent2 */
+  .btn-pdf {
+    width: 100%;
+    background: var(--accent2);
+    color: var(--toast-err-fg);
+    border: none;
+    border-radius: var(--radius-pill);
+    font-family: 'DM Mono', 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 17px;
+    cursor: pointer;
+    -webkit-appearance: none;
+  }
+
+  .btn-pdf:active { opacity: 0.85; }
+
+  /* About hero block */
+  .about-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 8px 0 20px;
+  }
+
+  .about-hero-icon {
+    font-size: 2.8rem;
+    line-height: 1;
+    margin-bottom: 14px;
+    filter: drop-shadow(0 0 12px rgba(224,92,92,0.35));
+  }
+
+  .about-hero-name {
+    font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--text);
+    margin-bottom: 6px;
+    letter-spacing: 0.01em;
+  }
+
+  .about-hero-amp {
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .about-hero-desc {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+    letter-spacing: 0.04em;
+  }
+
+  .about-version-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    background: var(--badge-crisis-bg);
+    border: 1px solid rgba(224,92,92,0.2);
+    border-radius: var(--radius-pill);
+    padding: 4px 12px;
+  }
+
+  .about-disclaimer {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.7;
+    text-align: center;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Confirm modal — centered, not bottom sheet */
+  .modal-overlay.modal-center {
+    align-items: center;
+    padding: 0 20px;
+  }
+
+  .modal-overlay.modal-center .modal-sheet {
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    max-width: 380px;
+    width: 100%;
+    transform: scale(0.96);
+    transition: transform 0.18s;
+  }
+
+  .modal-overlay.modal-center.open .modal-sheet {
+    transform: scale(1);
+  }
+
+  /* Icon above confirm title */
+  .confirm-icon {
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 12px;
+    line-height: 1;
+    color: var(--accent2);
+  }
+
+  .confirm-title-text {
+    font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+    font-size: 1.15rem;
+    font-weight: 300;
+    color: var(--text);
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  /* ── CUSTOM CONFIRM MODAL ELEMENTS ── */
+  .confirm-message {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.7;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn-confirm-cancel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-family: 'DM Mono', 'Courier New', Courier, monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 13px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .btn-confirm-cancel:active { border-color: var(--accent2); color: var(--accent2); }
+
+  .btn-confirm-ok {
+    background: var(--accent);
+    color: var(--btn-primary-fg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Mono', 'Courier New', Courier, monospace;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 13px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .btn-confirm-ok:active { opacity: 0.85; }
+  @media print {
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      color: #111111;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11pt;
+      padding: 20mm 15mm;
+    }
+  }
 
   /* ── DB LOADING STATE ── */
   .db-loading {
@@ -1049,10 +1283,56 @@
 
   <div class="hist-count" id="count-label"></div>
   <div id="history-list"></div>
+</div>
 
-  <div class="export-row">
-    <button class="btn-secondary" onclick="exportCSV()">&#8595; CSV izvoz</button>
+<!-- ══════════════════════════════
+     TAB: PODEŠAVANJA
+══════════════════════════════ -->
+<div id="tab-podesavanja" class="tab-panel">
+
+  <!-- Statistics -->
+  <div class="settings-section">
+    <div class="settings-section-title">Statistike</div>
+    <div id="settings-stats">
+      <div class="stat-row">
+        <span class="stat-label">Ukupno merenja</span>
+        <span class="stat-value" id="stat-measurements">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Aktivnih lekova</span>
+        <span class="stat-value" id="stat-meds">—</span>
+      </div>
+    </div>
   </div>
+
+  <!-- PDF export -->
+  <div class="settings-section">
+    <div class="settings-section-title">Izvoz podataka</div>
+    <button class="btn-pdf" onclick="exportPDF()">📄 Sačuvaj izveštaj kao PDF</button>
+  </div>
+
+  <!-- Data management -->
+  <div class="settings-section">
+    <div class="settings-section-title">Upravljanje podacima</div>
+    <button class="btn-danger" onclick="deleteAllMeasurements()">🗑 Obriši sva merenja</button>
+    <button class="btn-danger" onclick="deleteAllMeds()">🗑 Obriši sve lekove</button>
+    <button class="btn-danger" onclick="deleteAllData()">🗑 Obriši sve podatke</button>
+  </div>
+
+  <!-- About -->
+  <div class="settings-section">
+    <div class="about-hero">
+      <div class="about-hero-icon">❤️</div>
+      <div class="about-hero-name">Srce <span class="about-hero-amp">&amp;</span> Pritisak</div>
+      <div class="about-hero-desc">Lični dnevnik krvnog pritiska i lekova</div>
+      <span class="about-version-badge">v2.29</span>
+    </div>
+    <p class="about-disclaimer">
+      Ova aplikacija nije medicinski uređaj i ne zamenjuje savet lekara.
+      Sve vrednosti su informativnog karaktera.
+    </p>
+  </div>
+
 </div>
 
 <!-- ── TAB BAR ── -->
@@ -1066,7 +1346,23 @@
   <button class="tab-btn" id="tbtn-istorija" onclick="switchTab('istorija')" aria-label="Istorija">
     <span class="tab-icon" aria-hidden="true">📋</span>Istorija
   </button>
+  <button class="tab-btn" id="tbtn-podesavanja" onclick="switchTab('podesavanja')" aria-label="Podešavanja">
+    <span class="tab-icon" aria-hidden="true">⚙️</span>Podešavanja
+  </button>
 </nav>
+
+<!-- ── CUSTOM CONFIRM MODAL ── -->
+<div id="confirm-modal" class="modal-overlay modal-center" onclick="handleConfirmOverlayClick(event)">
+  <div class="modal-sheet">
+    <div id="confirm-icon" class="confirm-icon"></div>
+    <div id="confirm-title" class="confirm-title-text"></div>
+    <p id="confirm-message" class="confirm-message"></p>
+    <div class="confirm-actions">
+      <button class="btn-confirm-cancel" onclick="closeConfirmModal()">Odustani</button>
+      <button class="btn-confirm-ok" id="confirm-ok-btn">Obriši</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -1495,13 +1791,6 @@
       .replace(/"/g,'&quot;');
   }
 
-  /**
-   * Escapes double-quotes for CSV cell values.
-   * @param {string} s
-   * @returns {string}
-   */
-  function escCsv(s) { return String(s).replace(/"/g,'""'); }
-
   // ════════════════════════════
   // 5. UI RENDER FUNCTIONS
   // ════════════════════════════
@@ -1756,6 +2045,24 @@
     }
   }
 
+  /**
+   * Renders the Podešavanja tab — reads counts from IndexedDB and updates stat values.
+   */
+  async function renderSettings() {
+    try {
+      const [measurements, meds] = await Promise.all([
+        dbGetAll(STORE_MEASUREMENTS),
+        dbGetAll(STORE_MEDICATIONS),
+      ]);
+      document.getElementById('stat-measurements').textContent = measurements.length;
+      document.getElementById('stat-meds').textContent         = meds.length;
+    } catch (err) {
+      console.error('[renderSettings] Error:', err);
+      document.getElementById('stat-measurements').textContent = '—';
+      document.getElementById('stat-meds').textContent         = '—';
+    }
+  }
+
   // ════════════════════════════
   // 6. EVENT LISTENERS / ACTIONS
   // ════════════════════════════
@@ -1764,18 +2071,19 @@
 
   /**
    * Switches the active tab and re-renders its content.
-   * @param {string} name - "danas" | "lekovi" | "istorija"
+   * @param {string} name - "danas" | "lekovi" | "istorija" | "podesavanja"
    */
   function switchTab(name) {
-    ['danas', 'lekovi', 'istorija'].forEach(t => {
+    ['danas', 'lekovi', 'istorija', 'podesavanja'].forEach(t => {
       document.getElementById(`tab-${t}`).classList.toggle('active', t === name);
       document.getElementById(`tbtn-${t}`).classList.toggle('active', t === name);
     });
     // Persist active tab so refresh restores the same view
     sessionStorage.setItem('activeTab', name);
-    if (name === 'danas')    renderTodayMeds();
-    if (name === 'lekovi')   renderMeds();
-    if (name === 'istorija') renderHistory();
+    if (name === 'danas')       renderTodayMeds();
+    if (name === 'lekovi')      renderMeds();
+    if (name === 'istorija')    renderHistory();
+    if (name === 'podesavanja') renderSettings();
   }
 
   // ── AUTO-ADVANCE BP INPUTS ──
@@ -1845,14 +2153,19 @@
    * @param {number} id
    */
   async function deleteEntry(id) {
-    if (!confirm('Obrisati merenje?')) return;
-    try {
-      await dbDelete(STORE_MEASUREMENTS, id);
-      renderHistory();
-    } catch (err) {
-      console.error('[deleteEntry] Error:', err);
-      showToast('Greška pri brisanju merenja!', true);
-    }
+    showConfirm(
+      'Obriši merenje',
+      'Ovo merenje će biti trajno obrisano.',
+      async () => {
+        try {
+          await dbDelete(STORE_MEASUREMENTS, id);
+          renderHistory();
+        } catch (err) {
+          console.error('[deleteEntry] Error:', err);
+          showToast('Greška pri brisanju merenja!', true);
+        }
+      }
+    );
   }
 
   // ── MED TOGGLE ──
@@ -1992,102 +2305,254 @@
    * @param {number} medId
    */
   async function deleteMed(medId) {
-    if (!confirm('Obrisati lek?')) return;
-    try {
-      await dbDelete(STORE_MEDICATIONS, medId);
-      await deleteTakenForMed(medId);
-      renderMeds();
-      renderTodayMeds();
-    } catch (err) {
-      console.error('[deleteMed] Error:', err);
-      showToast('Greška pri brisanju leka!', true);
-    }
+    showConfirm(
+      'Obriši lek',
+      'Lek i sva istorija uzimanja za ovaj lek biće trajno obrisani.',
+      async () => {
+        try {
+          await dbDelete(STORE_MEDICATIONS, medId);
+          await deleteTakenForMed(medId);
+          renderMeds();
+          renderTodayMeds();
+        } catch (err) {
+          console.error('[deleteMed] Error:', err);
+          showToast('Greška pri brisanju leka!', true);
+        }
+      }
+    );
   }
 
-  // ── CSV EXPORT ──
+  // ── PDF EXPORT ──
 
   /**
-   * Exports all BP measurements (with per-day med status) as a UTF-8 CSV file.
-   * Triggers a browser download.
+   * Generates a print-friendly report of all BP measurements and opens the
+   * browser print dialog. On Android Chrome, the user selects "Save as PDF".
+   * Uses window.print() — no external dependencies, works fully offline.
    */
-  async function exportCSV() {
+  async function exportPDF() {
     try {
-      // Use IDB ts-index cursor — returns newest-first without JS sort
       const entries = await getMeasurementsSortedDesc();
       if (!entries.length) { showToast('Nema podataka za izvoz.', true); return; }
 
-      // Parallel DB reads — both queries are independent
       const [meds, allTaken] = await Promise.all([
         dbGetAll(STORE_MEDICATIONS),
         getAllTakenGrouped(),
       ]);
 
-      const medHeaders = meds.map(m => escCsv(m.name)).join(',');
-      const header = `Datum,Vreme,Gornji,Donji,Puls,Kategorija,Napomena${meds.length ? ',' + medHeaders : ''}`;
+      // Build rows HTML
+      const rowsHtml = entries.map(e => {
+        const dt  = new Date(e.ts);
+        const dd  = String(dt.getDate()).padStart(2,'0');
+        const mm  = String(dt.getMonth()+1).padStart(2,'0');
+        const hh  = String(dt.getHours()).padStart(2,'0');
+        const mi  = String(dt.getMinutes()).padStart(2,'0');
+        const cat = classify(e.sys, e.dia);
+        const dayTaken = allTaken.get(localDateOf(e.ts)) || new Map();
+        const medStr = meds.length
+          ? meds.map(m => `${escHtml(m.name)}: ${dayTaken.get(m.id) ? 'Da' : 'Ne'}`).join(', ')
+          : '—';
 
-      const rows = entries.map(e => {
-        const dt   = new Date(e.ts);
-        const dd   = String(dt.getDate()).padStart(2,'0');
-        const mm   = String(dt.getMonth()+1).padStart(2,'0');
-        const hh   = String(dt.getHours()).padStart(2,'0');
-        const mi   = String(dt.getMinutes()).padStart(2,'0');
-        const cat  = classify(e.sys, e.dia);
-        const dateKey  = localDateOf(e.ts);
-        const dayTaken = allTaken.get(dateKey) || new Map();
+        return `<tr>
+          <td>${dd}.${mm}.${dt.getFullYear()}</td>
+          <td>${hh}:${mi}</td>
+          <td><strong>${e.sys}/${e.dia}</strong></td>
+          <td>${e.pulse}</td>
+          <td>${cat.label}</td>
+          <td>${escHtml(e.note || '—')}</td>
+          ${meds.length ? `<td style="font-size:9pt">${medStr}</td>` : ''}
+        </tr>`;
+      }).join('');
 
-        const medCols = meds.map(m => dayTaken.get(m.id) ? 'Da' : 'Ne').join(',');
-        return `${dd}.${mm}.${dt.getFullYear()},${hh}:${mi},${e.sys},${e.dia},${e.pulse},${cat.label},"${(e.note||'').replace(/"/g,'""')}"${meds.length ? ',' + medCols : ''}`;
-      });
+      const medHeader = meds.length ? '<th>Lekovi</th>' : '';
 
-      const csv  = [header, ...rows].join('\n');
-      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const html = `<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<title>Srce & Pritisak — Izveštaj</title>
+<style>
+  body { font-family: 'Courier New', Courier, monospace; font-size: 10pt; color: #111; padding: 15mm 15mm; }
+  h1 { font-size: 16pt; font-weight: normal; margin-bottom: 4px; }
+  .sub { font-size: 9pt; color: #666; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.08em; text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; }
+  td { font-size: 9pt; padding: 5px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8f8f8; }
+  .footer { margin-top: 20px; font-size: 8pt; color: #888; border-top: 1px solid #ddd; padding-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>Srce &amp; Pritisak — Dnevnik pritiska</h1>
+  <div class="sub">Izvezeno: ${new Date().toLocaleDateString('sr-RS')} | Ukupno merenja: ${entries.length}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Datum</th><th>Vreme</th><th>Pritisak</th><th>Puls</th><th>Kategorija</th><th>Napomena</th>${medHeader}
+      </tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  <div class="footer">Ova aplikacija nije medicinski uređaj. Konsultujte lekara.</div>
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
 
-      // navigator.share() is preferred on Android TWA — a.click() is unreliable in TWA context.
-      // Falls back to anchor download for desktop browsers that don't support share API.
-      const filename = `srce_pritisak_${todayStr()}.csv`;
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'text/csv' })] })) {
+      // Open print window — TWA and Chrome both support this
+      const win = window.open('', '_blank');
+      if (!win) { showToast('Dozvolite popup prozore za PDF izvoz.', true); return; }
+      win.document.write(html);
+      win.document.close();
+    } catch (err) {
+      console.error('[exportPDF] Error:', err);
+      showToast('Greška pri izvozu!', true);
+    }
+  }
+
+  // ── DATA DELETION ──
+
+  /**
+   * Deletes all BP measurements from IndexedDB after user confirmation.
+   */
+  async function deleteAllMeasurements() {
+    showConfirm(
+      'Obriši sva merenja',
+      'Sva merenja pritiska će biti trajno izbrisana. Ova akcija se ne može poništiti.',
+      async () => {
         try {
-          await navigator.share({
-            files: [new File([blob], filename, { type: 'text/csv' })],
-            title: 'Srce & Pritisak — izvoz podataka',
-          });
-          return;
-        } catch (shareErr) {
-          // User cancelled share or share failed — fall through to anchor download
-          if (shareErr.name === 'AbortError') return;
-          console.warn('[exportCSV] navigator.share failed, falling back to anchor:', shareErr);
+          const tx = db.transaction(STORE_MEASUREMENTS, 'readwrite');
+          await promisifyRequest(tx.objectStore(STORE_MEASUREMENTS).clear());
+          showToast('Sva merenja su obrisana ✓');
+          renderSettings();
+        } catch (err) {
+          console.error('[deleteAllMeasurements] Error:', err);
+          showToast('Greška pri brisanju!', true);
         }
       }
+    );
+  }
 
-      // Fallback: anchor download (desktop / browsers without share API)
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('[exportCSV] Error:', err);
-      showToast('Greška pri izvozu!', true);
+  /**
+   * Deletes all medications and their taken records after user confirmation.
+   */
+  async function deleteAllMeds() {
+    showConfirm(
+      'Obriši sve lekove',
+      'Svi lekovi i istorija uzimanja će biti trajno obrisani. Ova akcija se ne može poništiti.',
+      async () => {
+        try {
+          const tx1 = db.transaction(STORE_MEDICATIONS, 'readwrite');
+          await promisifyRequest(tx1.objectStore(STORE_MEDICATIONS).clear());
+
+          const tx2 = db.transaction(STORE_TAKEN, 'readwrite');
+          await promisifyRequest(tx2.objectStore(STORE_TAKEN).clear());
+
+          showToast('Svi lekovi su obrisani ✓');
+          renderSettings();
+        } catch (err) {
+          console.error('[deleteAllMeds] Error:', err);
+          showToast('Greška pri brisanju!', true);
+        }
+      }
+    );
+  }
+
+  /**
+   * Deletes ALL data (measurements, medications, taken records) after user confirmation.
+   */
+  async function deleteAllData() {
+    showConfirm(
+      'Obriši sve podatke',
+      'Merenja, lekovi i istorija uzimanja će biti trajno izbrisani. Ova akcija se ne može poništiti.',
+      async () => {
+        try {
+          const stores = [STORE_MEASUREMENTS, STORE_MEDICATIONS, STORE_TAKEN];
+          await Promise.all(stores.map(name => {
+            const tx = db.transaction(name, 'readwrite');
+            return promisifyRequest(tx.objectStore(name).clear());
+          }));
+          showToast('Svi podaci su obrisani ✓');
+          renderSettings();
+          renderTodayMeds();
+        } catch (err) {
+          console.error('[deleteAllData] Error:', err);
+          showToast('Greška pri brisanju!', true);
+        }
+      }
+    );
+  }
+
+  // ── CUSTOM CONFIRM MODAL ──
+
+  /** Stores the callback to execute if user confirms */
+  let _confirmCallback = null;
+
+  /**
+   * Opens the custom confirm modal with a title, message, and callback.
+   * Replaces native confirm() which is blocked in some WebView/TWA contexts.
+   * @param {string}   title    - modal title
+   * @param {string}   message  - descriptive message shown to user
+   * @param {Function} callback - async function to execute on confirmation
+   */
+  function showConfirm(title, message, callback) {
+    _confirmCallback = callback;
+
+    // Always use warning triangle — consistent across all OS/browser versions
+    document.getElementById('confirm-icon').textContent    = '⚠';
+    document.getElementById('confirm-title').textContent   = title;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-ok-btn').onclick = async () => {
+      // Save callback reference BEFORE closing — closeConfirmModal() nulls _confirmCallback
+      const cb = _confirmCallback;
+      closeConfirmModal();
+      if (cb) await cb();
+    };
+    document.getElementById('confirm-modal').classList.add('open');
+  }
+
+  /** Closes the confirm modal and clears the pending callback. */
+  function closeConfirmModal() {
+    document.getElementById('confirm-modal').classList.remove('open');
+    _confirmCallback = null;
+  }
+
+  /**
+   * Closes the confirm modal when user taps the overlay background.
+   * @param {MouseEvent} event
+   */
+  function handleConfirmOverlayClick(event) {
+    if (event.target === document.getElementById('confirm-modal')) {
+      closeConfirmModal();
     }
   }
 
   // ── TOAST ──
 
+  /** Active toast timer — cleared if a new toast appears before the previous one hides */
+  let _toastTimer = null;
+
   /**
    * Shows a brief notification toast at the bottom of the screen.
-   * @param {string} msg    - message to display
+   * Duration scales with message length so longer messages stay visible longer.
+   * @param {string}  msg   - message to display
    * @param {boolean} isErr - true = error style (orange), false = success (green)
    */
   function showToast(msg, isErr = false) {
     const t = document.getElementById('toast');
+
+    // Cancel any in-progress toast timer before starting a new one
+    if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+
     t.textContent = msg;
     t.style.background = isErr ? 'var(--toast-err-bg)' : 'var(--toast-ok-bg)';
     t.style.color      = isErr ? 'var(--toast-err-fg)' : 'var(--toast-ok-fg)';
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2400);
+
+    // Duration scales with message length: short ≤30 → 2000ms, medium ≤60 → 2800ms, long → 3600ms
+    const duration = msg.length <= 30 ? 2000 : msg.length <= 60 ? 2800 : 3600;
+    _toastTimer = setTimeout(() => {
+      t.classList.remove('show');
+      _toastTimer = null;
+    }, duration);
   }
 
   // ── VISIBILITY CHANGE — refresh when user returns to app ──
@@ -2215,16 +2680,17 @@
     const savedTab = sessionStorage.getItem('activeTab') || 'danas';
     if (savedTab !== 'danas') {
       // Switch without re-rendering danas (it hasn't rendered yet)
-      ['danas', 'lekovi', 'istorija'].forEach(t => {
+      ['danas', 'lekovi', 'istorija', 'podesavanja'].forEach(t => {
         document.getElementById(`tab-${t}`).classList.toggle('active', t === savedTab);
         document.getElementById(`tbtn-${t}`).classList.toggle('active', t === savedTab);
       });
     }
 
     // Render the active tab
-    if (savedTab === 'danas')    await renderTodayMeds();
-    if (savedTab === 'lekovi')   renderMeds();
-    if (savedTab === 'istorija') renderHistory();
+    if (savedTab === 'danas')       await renderTodayMeds();
+    if (savedTab === 'lekovi')      renderMeds();
+    if (savedTab === 'istorija')    renderHistory();
+    if (savedTab === 'podesavanja') renderSettings();
 
     registerServiceWorker();
   }
