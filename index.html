@@ -1,4 +1,4 @@
-<!-- v2.33 | 2026-06-01 | Feat: arhiviranje lekova (active flag, collapsible archive section) -->
+<!-- v2.34 | 2026-06-01 | Fix: arhivirani lekovi ostaju vidljivi u istoriji -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -1472,7 +1472,7 @@
       <div class="about-hero-icon">❤️</div>
       <div class="about-hero-name">Srce <span class="about-hero-amp">&amp;</span> Pritisak</div>
       <div class="about-hero-desc">Lični dnevnik krvnog pritiska i lekova</div>
-      <span class="about-version-badge">v2.33</span>
+      <span class="about-version-badge">v2.34</span>
     </div>
     <p class="about-disclaimer">
       Ova aplikacija nije medicinski uređaj i ne zamenjuje savet lekara.
@@ -2288,8 +2288,9 @@
         getTakenForMonth(histViewMonth.year, histViewMonth.month),
       ]);
 
-      // Only show active medications in history pill row — archived ones are not relevant
-      const meds = allMeds.filter(m => m.active !== false);
+      // Use ALL medications (including archived) in history pill row — archived meds
+      // were active in the past and their taken records should remain visible in history.
+      const meds = allMeds;
 
       // Group entries by local date string "YYYY-MM-DD", preserving newest-first order
       const groups = new Map(); // Map<dateStr, entry[]>
