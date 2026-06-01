@@ -1,4 +1,4 @@
-<!-- v2.22 | 2026-06-01 | UX: improve med-check-item — gap, circle checkbox, taken bg, scale press, low-stock badge -->
+<!-- v2.24 | 2026-06-01 | UX: persist active tab in sessionStorage — restore on refresh -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -1310,8 +1310,11 @@
   async function renderTodayMeds() {
     const el = document.getElementById('today-meds-list');
     try {
-      const meds     = await dbGetAll(STORE_MEDICATIONS);
-      const todayMap = await getTakenForDate(todayStr());
+      // Parallel DB reads — both queries are independent, no need to await sequentially
+      const [meds, todayMap] = await Promise.all([
+        dbGetAll(STORE_MEDICATIONS),
+        getTakenForDate(todayStr()),
+      ]);
 
       if (!meds.length) {
         el.innerHTML = `<div class="today-empty"><p>Nema lekova.</p><button class="btn-add-med-empty" onclick="switchTab('lekovi')">+ Dodaj lek</button></div>`;
@@ -1469,9 +1472,11 @@
         return;
       }
 
-      const meds     = await dbGetAll(STORE_MEDICATIONS);
-      // Load taken records only for the viewed month — avoids full table scan
-      const allTaken = await getTakenForMonth(histViewMonth.year, histViewMonth.month);
+      // Parallel DB reads — both queries are independent
+      const [meds, allTaken] = await Promise.all([
+        dbGetAll(STORE_MEDICATIONS),
+        getTakenForMonth(histViewMonth.year, histViewMonth.month),
+      ]);
 
       // Group entries by local date string "YYYY-MM-DD", preserving newest-first order
       const groups = new Map(); // Map<dateStr, entry[]>
@@ -1549,6 +1554,8 @@
       document.getElementById(`tab-${t}`).classList.toggle('active', t === name);
       document.getElementById(`tbtn-${t}`).classList.toggle('active', t === name);
     });
+    // Persist active tab so refresh restores the same view
+    sessionStorage.setItem('activeTab', name);
     if (name === 'danas')    renderTodayMeds();
     if (name === 'lekovi')   renderMeds();
     if (name === 'istorija') renderHistory();
@@ -1792,8 +1799,11 @@
       const entries = await getMeasurementsSortedDesc();
       if (!entries.length) { showToast('Nema podataka za izvoz.', true); return; }
 
-      const meds     = await dbGetAll(STORE_MEDICATIONS);
-      const allTaken = await getAllTakenGrouped();
+      // Parallel DB reads — both queries are independent
+      const [meds, allTaken] = await Promise.all([
+        dbGetAll(STORE_MEDICATIONS),
+        getAllTakenGrouped(),
+      ]);
 
       const medHeaders = meds.map(m => escCsv(m.name)).join(',');
       const header = `Datum,Vreme,Gornji,Donji,Puls,Kategorija,Napomena${meds.length ? ',' + medHeaders : ''}`;
@@ -1945,7 +1955,22 @@
     histViewMonth = { year: now.getFullYear(), month: now.getMonth() };
 
     setDateTimeDefaults();
-    await renderTodayMeds();
+
+    // Restore last active tab — falls back to 'danas' if nothing stored
+    const savedTab = sessionStorage.getItem('activeTab') || 'danas';
+    if (savedTab !== 'danas') {
+      // Switch without re-rendering danas (it hasn't rendered yet)
+      ['danas', 'lekovi', 'istorija'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === savedTab);
+        document.getElementById(`tbtn-${t}`).classList.toggle('active', t === savedTab);
+      });
+    }
+
+    // Render the active tab
+    if (savedTab === 'danas')    await renderTodayMeds();
+    if (savedTab === 'lekovi')   renderMeds();
+    if (savedTab === 'istorija') renderHistory();
+
     registerServiceWorker();
   }
 
