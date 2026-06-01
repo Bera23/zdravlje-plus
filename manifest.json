@@ -1,7 +1,7 @@
 {
-  "id": "com.zdravlje.pritisak",
-  "name": "Zdravlje+ Pritisak Dnevnik",
-  "short_name": "Zdravlje+",
+  "id": "com.srce.pritisak",
+  "name": "Srce & Pritisak",
+  "short_name": "Srce & Pritisak",
   "description": "Lični dnevnik krvnog pritiska i lekova",
   "start_url": "./index.html",
   "scope": "./",
