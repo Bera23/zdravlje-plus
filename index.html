@@ -1,4 +1,4 @@
-<!-- v2.30 | 2026-06-01 | Feat: kartica poslednjeg merenja na Danas tabu; uklonjen mrtav @media print blok -->
+<!-- v2.32 | 2026-06-01 | Chore: uklonjen mrtav CSS (.btn-secondary, .last-reading-empty) -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -305,20 +305,6 @@
   }
 
   .btn-primary:active { opacity: 0.85; }
-
-  .btn-secondary {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--muted);
-    font-family: 'DM Mono', 'Courier New', Courier, monospace;
-    font-size: 0.72rem;
-    padding: 10px 16px;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .btn-secondary:active { border-color: var(--accent2); color: var(--accent2); }
 
   /* ── TODAY MEDS ── */
   .med-check-item {
@@ -640,6 +626,51 @@
   /* Filter row */
   .hist-count { font-size: 0.75rem; color: var(--muted); margin-bottom: 12px; }
 
+  /* ── MONTH AVERAGE CARD (Istorija tab) ── */
+
+  .month-avg-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+
+  .month-avg-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Left and center items get a right border divider */
+  .month-avg-item:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+
+  .month-avg-label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .month-avg-value {
+    font-size: 1.35rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .month-avg-unit {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
   /* Day group card — wraps all entries for one day */
   .day-group {
     background: var(--surface);
@@ -811,13 +842,6 @@
     align-items: flex-end;
     flex-shrink: 0;
     gap: 6px;
-  }
-
-  .last-reading-empty {
-    font-size: 0.78rem;
-    color: var(--muted);
-    text-align: center;
-    padding: 6px 0;
   }
 
   /* ── SETTINGS TAB ── */
@@ -1325,6 +1349,7 @@
   </div>
 
   <div class="hist-count" id="count-label"></div>
+  <div id="month-avg"></div>
   <div id="history-list"></div>
 </div>
 
@@ -1368,7 +1393,7 @@
       <div class="about-hero-icon">❤️</div>
       <div class="about-hero-name">Srce <span class="about-hero-amp">&amp;</span> Pritisak</div>
       <div class="about-hero-desc">Lični dnevnik krvnog pritiska i lekova</div>
-      <span class="about-version-badge">v2.30</span>
+      <span class="about-version-badge">v2.32</span>
     </div>
     <p class="about-disclaimer">
       Ova aplikacija nije medicinski uređaj i ne zamenjuje savet lekara.
@@ -1834,6 +1859,22 @@
       .replace(/"/g,'&quot;');
   }
 
+  /**
+   * Calculates average systolic, diastolic, and pulse for a set of entries.
+   * Returns rounded integer averages. Returns null if array is empty.
+   * @param {Array<{sys: number, dia: number, pulse: number}>} entries
+   * @returns {{ sys: number, dia: number, pulse: number } | null}
+   */
+  function calcMonthAvg(entries) {
+    if (!entries.length) return null;
+    const n = entries.length;
+    return {
+      sys:   Math.round(entries.reduce((s, e) => s + e.sys,   0) / n),
+      dia:   Math.round(entries.reduce((s, e) => s + e.dia,   0) / n),
+      pulse: Math.round(entries.reduce((s, e) => s + e.pulse, 0) / n),
+    };
+  }
+
   // ════════════════════════════
   // 5. UI RENDER FUNCTIONS
   // ════════════════════════════
@@ -2079,6 +2120,34 @@
       });
 
       document.getElementById('count-label').textContent = `${entries.length} unosa`;
+
+      // Render monthly average card — shown even if there are entries, hidden if empty
+      const avgEl = document.getElementById('month-avg');
+      const avg   = calcMonthAvg(entries);
+      if (avg) {
+        const avgCat = classify(avg.sys, avg.dia);
+        const avgSc  = `sys-${avgCat.cls}`;
+        avgEl.innerHTML = `
+          <div class="month-avg-card">
+            <div class="month-avg-item">
+              <span class="month-avg-label">Prosek sys</span>
+              <span class="month-avg-value ${avgSc}">${avg.sys}</span>
+              <span class="month-avg-unit">mmHg</span>
+            </div>
+            <div class="month-avg-item">
+              <span class="month-avg-label">Prosek dia</span>
+              <span class="month-avg-value ${avgSc}">${avg.dia}</span>
+              <span class="month-avg-unit">mmHg</span>
+            </div>
+            <div class="month-avg-item">
+              <span class="month-avg-label">Prosek puls</span>
+              <span class="month-avg-value">${avg.pulse}</span>
+              <span class="month-avg-unit">bpm</span>
+            </div>
+          </div>`;
+      } else {
+        avgEl.innerHTML = '';
+      }
 
       if (!entries.length) {
         list.innerHTML = '<div class="empty">Nema unosa.</div>';
