@@ -1,4 +1,4 @@
-<!-- v2.24 | 2026-06-01 | UX: persist active tab in sessionStorage — restore on refresh -->
+<!-- v2.25 | 2026-06-01 | Feat: 4-category BP classification (ESC/ESH) + info modal on badge tap -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -63,8 +63,12 @@
 
     /* Badge backgrounds */
     --badge-normal-bg: rgba(92,186,138,0.15);
+    --badge-elevated-bg: rgba(212,184,74,0.15);
     --badge-high-bg: rgba(240,160,96,0.15);
     --badge-crisis-bg: rgba(224,92,92,0.15);
+
+    /* Elevated BP color (yellow — sits between good and accent2) */
+    --elevated: #d4b84a;
 
     /* Nav bar background (slightly darker than --bg) */
     --bg-nav: #111114;
@@ -713,9 +717,10 @@
     white-space: nowrap;
   }
 
-  .badge-normal { background: var(--badge-normal-bg); color: var(--good); }
-  .badge-high   { background: var(--badge-high-bg);   color: var(--accent2); }
-  .badge-crisis { background: var(--badge-crisis-bg); color: var(--accent); }
+  .badge-normal   { background: var(--badge-normal-bg);   color: var(--good); }
+  .badge-elevated { background: var(--badge-elevated-bg); color: var(--elevated); }
+  .badge-high     { background: var(--badge-high-bg);     color: var(--accent2); }
+  .badge-crisis   { background: var(--badge-crisis-bg);   color: var(--accent); }
 
   .btn-del-entry {
     background: none; border: none; color: var(--border);
@@ -724,9 +729,10 @@
 
   .btn-del-entry:active { color: var(--accent); }
 
-  .sys-normal { color: var(--good); }
-  .sys-high   { color: var(--accent2); }
-  .sys-crisis { color: var(--accent); }
+  .sys-normal   { color: var(--good); }
+  .sys-elevated { color: var(--elevated); }
+  .sys-high     { color: var(--accent2); }
+  .sys-crisis   { color: var(--accent); }
 
   .empty {
     text-align: center; color: var(--muted);
@@ -772,6 +778,139 @@
     margin-bottom: 10px;
     padding: 0 2px;
   }
+
+  /* ── BP INFO MODAL ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s;
+  }
+
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal-sheet {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 24px 20px calc(var(--safe-bottom) + 28px);
+    width: 100%;
+    max-width: 480px;
+    transform: translateY(24px);
+    transition: transform 0.22s;
+  }
+
+  .modal-overlay.open .modal-sheet {
+    transform: translateY(0);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .modal-title {
+    font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+    font-size: 1.1rem;
+    font-weight: 300;
+    color: var(--text);
+  }
+
+  .modal-close {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xxs);
+    color: var(--muted);
+    font-size: 1rem;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .modal-close:active { border-color: var(--accent); color: var(--accent); }
+
+  /* BP classification table */
+  .bp-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+
+  .bp-table th {
+    font-size: 0.54rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 0 10px 10px 10px;
+  }
+
+  .bp-table th:last-child { text-align: right; }
+
+  .bp-table td {
+    font-size: 0.72rem;
+    padding: 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  .bp-table td:last-child { text-align: right; }
+
+  .bp-table tr.active-row td {
+    background: var(--surface2);
+  }
+
+  .bp-table tr.active-row td:first-child {
+    border-left: 2px solid currentColor;
+    padding-left: 8px;
+  }
+
+  .bp-cat-label {
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bp-cat-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: currentColor;
+  }
+
+  .cat-normal   { color: var(--good); }
+  .cat-elevated { color: var(--elevated); }
+  .cat-high     { color: var(--accent2); }
+  .cat-crisis   { color: var(--accent); }
+
+  .modal-footnote {
+    font-size: 0.6rem;
+    color: var(--muted);
+    line-height: 1.6;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  /* Badge tappable — subtle affordance */
+  .badge { cursor: pointer; }
+  .badge:active { opacity: 0.75; }
 </style>
 </head>
 <body>
@@ -902,6 +1041,54 @@
 </nav>
 
 <div id="toast"></div>
+
+<!-- ── BP INFO MODAL ── -->
+<div id="bp-info-modal" class="modal-overlay" onclick="handleModalOverlayClick(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <span class="modal-title">Klasifikacija pritiska</span>
+      <button class="modal-close" onclick="closeBpModal()" aria-label="Zatvori">✕</button>
+    </div>
+
+    <table class="bp-table">
+      <thead>
+        <tr>
+          <th>Kategorija</th>
+          <th>Sistolni</th>
+          <th>Dijastolni</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="bp-row-normal" class="bp-row">
+          <td><span class="bp-cat-label cat-normal"><span class="bp-cat-dot"></span>Normalan</span></td>
+          <td>&lt; 130</td>
+          <td>&lt; 85</td>
+        </tr>
+        <tr id="bp-row-elevated" class="bp-row">
+          <td><span class="bp-cat-label cat-elevated"><span class="bp-cat-dot"></span>Povišen</span></td>
+          <td>130 – 139</td>
+          <td>85 – 89</td>
+        </tr>
+        <tr id="bp-row-high" class="bp-row">
+          <td><span class="bp-cat-label cat-high"><span class="bp-cat-dot"></span>Visok</span></td>
+          <td>140 – 179</td>
+          <td>90 – 109</td>
+        </tr>
+        <tr id="bp-row-crisis" class="bp-row">
+          <td><span class="bp-cat-label cat-crisis"><span class="bp-cat-dot"></span>Kriza</span></td>
+          <td>≥ 180</td>
+          <td>≥ 110</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="modal-footnote">
+      Klasifikacija prema ESC/ESH smernicama (2018).<br>
+      Vrednost se određuje po višoj od dve kategorije (sistolna ili dijastolna).<br>
+      Ova aplikacija nije medicinski uređaj — konsultujte lekara.
+    </div>
+  </div>
+</div>
 
 <script>
   // ════════════════════════════
@@ -1235,15 +1422,17 @@
   // ════════════════════════════
 
   /**
-   * Classifies a blood pressure reading.
+   * Classifies a blood pressure reading per ESC/ESH 2018 guidelines.
+   * Category is determined by the higher of the two values (sys or dia).
    * @param {number} sys - systolic
    * @param {number} dia - diastolic
    * @returns {{ label: string, cls: string }}
    */
   function classify(sys, dia) {
-    if (sys >= 180 || dia >= 110) return { label: 'Kriza',    cls: 'crisis' };
-    if (sys >= 140 || dia >= 90)  return { label: 'Visok',    cls: 'high'   };
-    return                               { label: 'Normalan', cls: 'normal'  };
+    if (sys >= 180 || dia >= 110) return { label: 'Kriza',    cls: 'crisis'   };
+    if (sys >= 140 || dia >= 90)  return { label: 'Visok',    cls: 'high'     };
+    if (sys >= 130 || dia >= 85)  return { label: 'Povišen',  cls: 'elevated' };
+    return                               { label: 'Normalan', cls: 'normal'   };
   }
 
   /**
@@ -1519,7 +1708,7 @@
                 ${medPills ? `<div class="entry-meds">${medPills}</div>` : ''}
               </div>
               <div class="entry-right">
-                <span class="badge badge-${cat.cls}">${cat.label}</span>
+                <span class="badge badge-${cat.cls}" onclick="showBpModal('${cat.cls}')" role="button" aria-label="Objašnjenje kategorije ${cat.label}">${cat.label}</span>
                 <button class="btn-del-entry" onclick="deleteEntry(${e.id})">✕</button>
               </div>
             </div>`;
@@ -1930,6 +2119,44 @@
         location.reload();
       }
     });
+  }
+
+  // ── BP INFO MODAL ──
+
+  /**
+   * Opens the BP classification info modal.
+   * Highlights the table row that matches the tapped badge category.
+   * @param {string} activeCls - "normal" | "elevated" | "high" | "crisis"
+   */
+  function showBpModal(activeCls) {
+    // Clear any previously highlighted row
+    document.querySelectorAll('.bp-row').forEach(row => {
+      row.classList.remove('active-row');
+    });
+
+    // Highlight the row matching the tapped category
+    const activeRow = document.getElementById(`bp-row-${activeCls}`);
+    if (activeRow) activeRow.classList.add('active-row');
+
+    document.getElementById('bp-info-modal').classList.add('open');
+  }
+
+  /**
+   * Closes the BP classification info modal.
+   */
+  function closeBpModal() {
+    document.getElementById('bp-info-modal').classList.remove('open');
+  }
+
+  /**
+   * Closes the modal when user taps the overlay (outside the sheet).
+   * Ignores taps that originate from inside the sheet itself.
+   * @param {MouseEvent} event
+   */
+  function handleModalOverlayClick(event) {
+    if (event.target === document.getElementById('bp-info-modal')) {
+      closeBpModal();
+    }
   }
 
   /**
