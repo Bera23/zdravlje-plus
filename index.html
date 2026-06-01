@@ -1,4 +1,4 @@
-<!-- v2.32 | 2026-06-01 | Chore: uklonjen mrtav CSS (.btn-secondary, .last-reading-empty) -->
+<!-- v2.33 | 2026-06-01 | Feat: arhiviranje lekova (active flag, collapsible archive section) -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -83,6 +83,11 @@
 
     /* Input focus ring */
     --focus-ring: rgba(224,92,92,0.18);
+
+    /* Archived medication — muted appearance */
+    --archived-border: rgba(46,46,56,0.6);
+    --archived-text: rgba(122,122,136,0.7);
+    --btn-archive-color: var(--muted);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -502,6 +507,80 @@
   }
 
   .btn-stock-adj:active { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── ARCHIVE MED BUTTON — inline action next to delete ── */
+  .btn-archive-med {
+    background: none;
+    border: none;
+    color: var(--btn-archive-color);
+    font-size: 0.72rem;
+    font-family: 'DM Mono', 'Courier New', Courier, monospace;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-xxs);
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-archive-med:active { color: var(--accent2); }
+
+  /* ── ARCHIVED MED CARD — visually suppressed ── */
+  .med-card.archived {
+    opacity: 0.55;
+    border-color: var(--archived-border);
+  }
+
+  .med-card.archived .med-card-name {
+    color: var(--archived-text);
+  }
+
+  /* ── ARCHIVE SECTION TOGGLE HEADER ── */
+  .archive-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 10px 2px;
+    margin-top: 6px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .archive-section-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .archive-section-count {
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    padding: 2px 8px;
+    margin-left: 8px;
+  }
+
+  .archive-toggle-icon {
+    font-size: 0.8rem;
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+
+  .archive-toggle-icon.open {
+    transform: rotate(180deg);
+  }
+
+  .archive-list {
+    /* Hidden by default — toggled via JS */
+    display: none;
+  }
+
+  .archive-list.open {
+    display: block;
+  }
 
   /* stock bar */
   .form-row-grid .form-row { margin-bottom: 0; }
@@ -1393,7 +1472,7 @@
       <div class="about-hero-icon">❤️</div>
       <div class="about-hero-name">Srce <span class="about-hero-amp">&amp;</span> Pritisak</div>
       <div class="about-hero-desc">Lični dnevnik krvnog pritiska i lekova</div>
-      <span class="about-version-badge">v2.32</span>
+      <span class="about-version-badge">v2.33</span>
     </div>
     <p class="about-disclaimer">
       Ova aplikacija nije medicinski uređaj i ne zamenjuje savet lekara.
@@ -1959,19 +2038,23 @@
 
   /**
    * Renders the "Lekovi danas" section with today's med checkboxes.
+   * Only active (non-archived) medications are shown.
    * Reads medications and today's taken records from IndexedDB.
    */
   async function renderTodayMeds() {
     const el = document.getElementById('today-meds-list');
     try {
       // Parallel DB reads — both queries are independent, no need to await sequentially
-      const [meds, todayMap] = await Promise.all([
+      const [allMeds, todayMap] = await Promise.all([
         dbGetAll(STORE_MEDICATIONS),
         getTakenForDate(todayStr()),
       ]);
 
+      // Only show active medications — archived ones are hidden from daily view
+      const meds = allMeds.filter(m => m.active !== false);
+
       if (!meds.length) {
-        el.innerHTML = `<div class="today-empty"><p>Nema lekova.</p><button class="btn-add-med-empty" onclick="switchTab('lekovi')">+ Dodaj lek</button></div>`;
+        el.innerHTML = `<div class="today-empty"><p>Nema aktivnih lekova.</p><button class="btn-add-med-empty" onclick="switchTab('lekovi')">+ Dodaj lek</button></div>`;
         return;
       }
 
@@ -1998,20 +2081,30 @@
 
   /**
    * Renders the medications management tab.
+   * Splits medications into active and archived sections.
+   * Archived section is collapsible and hidden by default.
    * Reads all medications from IndexedDB.
    */
   async function renderMeds() {
     const el = document.getElementById('med-list');
     try {
-      const meds = await dbGetAll(STORE_MEDICATIONS);
+      const allMeds = await dbGetAll(STORE_MEDICATIONS);
 
-      if (!meds.length) {
+      if (!allMeds.length) {
         el.innerHTML = '<div class="empty">Nema lekova.</div>';
         return;
       }
 
-      el.innerHTML = meds.map(m => {
-        // Stock bar — only if qty is defined
+      const activeMeds   = allMeds.filter(m => m.active !== false);
+      const archivedMeds = allMeds.filter(m => m.active === false);
+
+      /**
+       * Builds the HTML for a single med card.
+       * @param {Object}  m          - medication record
+       * @param {boolean} isArchived - controls which action button is shown
+       * @returns {string}
+       */
+      function buildMedCard(m, isArchived) {
         let stockHtml = '';
         if (m.qty && m.stock !== null) {
           const pct = Math.min(100, Math.round((m.stock / m.qty) * 100));
@@ -2030,30 +2123,65 @@
           m.price ? `${m.price} din`      : null,
         ].filter(Boolean).join(' · ');
 
+        // Archive button: active meds get "Arhiviraj", archived meds get "Vrati"
+        const archiveBtn = isArchived
+          ? `<button class="btn-archive-med" onclick="unarchiveMed(${m.id})">Vrati</button>`
+          : `<button class="btn-archive-med" onclick="archiveMed(${m.id})">Arhiviraj</button>`;
+
+        // Stock controls are hidden for archived meds — they're not in use
+        const footerHtml = !isArchived && (m.qty || m.stock !== null) ? `
+          <div class="med-card-footer">
+            ${m.qty ? `<button class="btn-refill" onclick="refillMed(${m.id})">+ Kutija</button>` : ''}
+            ${m.stock !== null ? `
+            <div class="med-stock-controls">
+              <button class="btn-stock-adj" onclick="adjustStock(${m.id}, -1)">–1</button>
+              <span class="stock-count-display">${m.stock}</span>
+              <button class="btn-stock-adj" onclick="adjustStock(${m.id}, +1)">+1</button>
+            </div>` : ''}
+          </div>` : '';
+
         return `
-          <div class="med-card">
+          <div class="med-card${isArchived ? ' archived' : ''}">
             <div class="med-card-header">
               <div>
                 <div class="med-card-name">${escHtml(m.name)}</div>
                 ${meta ? `<div class="med-card-meta">${meta}</div>` : ''}
               </div>
               <div class="med-card-actions">
+                ${archiveBtn}
                 <button class="btn-del-med" onclick="deleteMed(${m.id})">✕</button>
               </div>
             </div>
-            ${stockHtml}
-            ${(m.qty || m.stock !== null) ? `
-            <div class="med-card-footer">
-              ${m.qty ? `<button class="btn-refill" onclick="refillMed(${m.id})">+ Kutija</button>` : ''}
-              ${m.stock !== null ? `
-              <div class="med-stock-controls">
-                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, -1)">–1</button>
-                <span class="stock-count-display">${m.stock !== null ? m.stock : '—'}</span>
-                <button class="btn-stock-adj" onclick="adjustStock(${m.id}, +1)">+1</button>
-              </div>` : ''}
-            </div>` : ''}
+            ${!isArchived ? stockHtml : ''}
+            ${footerHtml}
           </div>`;
-      }).join('');
+      }
+
+      let html = '';
+
+      // Active medications — rendered first, always visible
+      if (activeMeds.length) {
+        html += activeMeds.map(m => buildMedCard(m, false)).join('');
+      } else {
+        html += '<div class="empty">Nema aktivnih lekova.</div>';
+      }
+
+      // Archived medications — collapsible section, hidden by default
+      if (archivedMeds.length) {
+        html += `
+          <div class="archive-section-header" onclick="toggleArchiveSection()">
+            <div>
+              <span class="archive-section-label">Arhiva</span>
+              <span class="archive-section-count">${archivedMeds.length}</span>
+            </div>
+            <span class="archive-toggle-icon" id="archive-toggle-icon">▼</span>
+          </div>
+          <div class="archive-list" id="archive-list">
+            ${archivedMeds.map(m => buildMedCard(m, true)).join('')}
+          </div>`;
+      }
+
+      el.innerHTML = html;
     } catch (err) {
       console.error('[renderMeds] Error:', err);
       el.innerHTML = '<div class="empty">Greška pri učitavanju lekova.</div>';
@@ -2155,10 +2283,13 @@
       }
 
       // Parallel DB reads — both queries are independent
-      const [meds, allTaken] = await Promise.all([
+      const [allMeds, allTaken] = await Promise.all([
         dbGetAll(STORE_MEDICATIONS),
         getTakenForMonth(histViewMonth.year, histViewMonth.month),
       ]);
+
+      // Only show active medications in history pill row — archived ones are not relevant
+      const meds = allMeds.filter(m => m.active !== false);
 
       // Group entries by local date string "YYYY-MM-DD", preserving newest-first order
       const groups = new Map(); // Map<dateStr, entry[]>
@@ -2415,7 +2546,8 @@
     const price = priceRaw ? parseInt(priceRaw, 10) : null;
 
     try {
-      await dbPut(STORE_MEDICATIONS, { id: Date.now(), name, qty, price, stock: qty });
+      // New medications are always active by default
+      await dbPut(STORE_MEDICATIONS, { id: Date.now(), name, qty, price, stock: qty, active: true });
       ['med-name', 'med-qty', 'med-price'].forEach(id => {
         document.getElementById(id).value = '';
       });
@@ -2499,6 +2631,59 @@
     );
   }
 
+  // ── MED ARCHIVE ──
+
+  /**
+   * Archives a medication — sets active=false so it no longer appears in daily view.
+   * Does NOT delete the medication or its taken records.
+   * @param {number} medId
+   */
+  async function archiveMed(medId) {
+    try {
+      const med = await dbGet(STORE_MEDICATIONS, medId);
+      if (!med) return;
+      med.active = false;
+      await dbPut(STORE_MEDICATIONS, med);
+      showToast(`${med.name} arhiviran ✓`);
+      renderMeds();
+      renderTodayMeds(); // remove from daily checklist immediately
+    } catch (err) {
+      console.error('[archiveMed] Error:', err);
+      showToast('Greška pri arhiviranju leka!', true);
+    }
+  }
+
+  /**
+   * Restores an archived medication — sets active=true so it reappears in daily view.
+   * @param {number} medId
+   */
+  async function unarchiveMed(medId) {
+    try {
+      const med = await dbGet(STORE_MEDICATIONS, medId);
+      if (!med) return;
+      med.active = true;
+      await dbPut(STORE_MEDICATIONS, med);
+      showToast(`${med.name} vraćen ✓`);
+      renderMeds();
+      renderTodayMeds(); // add back to daily checklist immediately
+    } catch (err) {
+      console.error('[unarchiveMed] Error:', err);
+      showToast('Greška pri vraćanju leka!', true);
+    }
+  }
+
+  /**
+   * Toggles the visibility of the archived medications section in the Lekovi tab.
+   * Reads/writes open state via CSS classes — no extra state variable needed.
+   */
+  function toggleArchiveSection() {
+    const list = document.getElementById('archive-list');
+    const icon = document.getElementById('archive-toggle-icon');
+    if (!list || !icon) return;
+    list.classList.toggle('open');
+    icon.classList.toggle('open');
+  }
+
   // ── PDF EXPORT ──
 
   /**
@@ -2511,10 +2696,13 @@
       const entries = await getMeasurementsSortedDesc();
       if (!entries.length) { showToast('Nema podataka za izvoz.', true); return; }
 
-      const [meds, allTaken] = await Promise.all([
+      const [allMeds, allTaken] = await Promise.all([
         dbGetAll(STORE_MEDICATIONS),
         getAllTakenGrouped(),
       ]);
+
+      // Only include active medications in the report — archived ones are no longer in use
+      const meds = allMeds.filter(m => m.active !== false);
 
       // Build rows HTML
       const rowsHtml = entries.map(e => {
