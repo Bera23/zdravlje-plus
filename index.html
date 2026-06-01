@@ -1,4 +1,4 @@
-<!-- v2.21 | 2026-06-01 | Fix: remove controller guard in SW_UPDATED listener to ensure auto-reload fires -->
+<!-- v2.22 | 2026-06-01 | UX: improve med-check-item — gap, circle checkbox, taken bg, scale press, low-stock badge -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -74,6 +74,7 @@
 
     /* Med pill backgrounds */
     --pill-ok-bg: rgba(92,186,138,0.12);
+    --taken-bg: rgba(92,186,138,0.06);
     --pill-nok-bg: rgba(224,92,92,0.12);
 
     /* Input focus ring */
@@ -318,18 +319,25 @@
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: var(--radius-med-item);
-    padding: 16px;
+    padding: 18px 16px;
     cursor: pointer;
-    transition: border-color 0.18s;
+    transition: border-color 0.18s, background 0.18s, transform 0.1s;
     -webkit-user-select: none;
     user-select: none;
   }
 
-  .med-check-item.taken { border-color: var(--good); }
+  .med-check-item:active {
+    transform: scale(0.98);
+  }
+
+  .med-check-item.taken {
+    border-color: var(--good);
+    background: var(--taken-bg);
+  }
 
   .med-checkbox {
-    width: 26px; height: 26px;
-    border-radius: var(--radius-xs);
+    width: 28px; height: 28px;
+    border-radius: 50%;
     border: 2px solid var(--border);
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
@@ -347,10 +355,10 @@
   .med-check-info { flex: 1; }
 
   .med-check-name {
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     font-weight: 500;
     color: var(--text);
-    margin-bottom: 2px;
+    margin-bottom: 3px;
   }
 
   .med-check-sub {
@@ -359,9 +367,20 @@
   }
 
   .low-stock-warn {
-    font-size: 0.62rem;
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 500;
     color: var(--accent2);
-    margin-top: 2px;
+    background: var(--badge-high-bg);
+    border-radius: var(--radius-pill);
+    padding: 2px 8px;
+    margin-top: 4px;
+  }
+
+  #today-meds-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .today-empty {
