@@ -1,4 +1,4 @@
-<!-- v2.20 | 2026-06-01 | UX: remove date filter from history tab, month nav only -->
+<!-- v2.21 | 2026-06-01 | Fix: remove controller guard in SW_UPDATED listener to ensure auto-reload fires -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -1891,10 +1891,12 @@
       });
 
     // Listen for SW_UPDATED message — reload to apply the new cached version.
-    // navigator.serviceWorker.controller is null on first install (no old SW),
-    // so the reload only fires when an existing SW is replaced by a new one.
+    // No controller guard: clients.claim() and postMessage happen together during
+    // activate, so controller may not yet be set when the message arrives.
+    // The SW only sends SW_UPDATED after a real version change (new content hash),
+    // so a reload loop cannot occur — a fresh page load finds no new SW waiting.
     navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'SW_UPDATED' && navigator.serviceWorker.controller) {
+      if (event.data?.type === 'SW_UPDATED') {
         console.log('[SW] New version active — reloading.');
         location.reload();
       }
