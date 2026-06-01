@@ -1,4 +1,4 @@
-<!-- v2.19 | 2026-06-01 | Fix: hardcoded color → var(--toast-err-fg), remove dead .med-check-list CSS -->
+<!-- v2.20 | 2026-06-01 | UX: remove date filter from history tab, month nav only -->
 <!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -610,27 +610,6 @@
   .month-nav-btn:active { border-color: var(--accent); color: var(--accent); }
 
   /* Filter row */
-  .hist-filter-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    align-items: center;
-  }
-
-  .hist-filter-row input[type="date"] {
-    flex: 1;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    font-family: 'DM Mono', 'Courier New', Courier, monospace;
-    font-size: max(1rem, 16px); /* min 16px — prevents Android keyboard auto-zoom */
-    padding: 11px 12px;
-    outline: none;
-    color-scheme: dark;
-    -webkit-appearance: none;
-  }
-
   .hist-count { font-size: 0.65rem; color: var(--muted); margin-bottom: 12px; }
 
   /* Day group card — wraps all entries for one day */
@@ -880,12 +859,6 @@
     <button class="month-nav-btn" onclick="shiftMonth(-1)" aria-label="Prethodni mesec">&#8249;</button>
     <span class="month-nav-label" id="month-nav-label"></span>
     <button class="month-nav-btn" onclick="shiftMonth(+1)" aria-label="Sledeci mesec">&#8250;</button>
-  </div>
-
-  <!-- Date filter -->
-  <div class="hist-filter-row">
-    <input type="date" id="filter-date" onchange="renderHistory()" autocomplete="off">
-    <button class="btn-secondary" onclick="clearHistFilter()">Sve</button>
   </div>
 
   <div class="hist-count" id="count-label"></div>
@@ -1432,8 +1405,6 @@
     if (month < 0)  { month = 11; year -= 1; }
     if (month > 11) { month = 0;  year += 1; }
     histViewMonth = { year, month };
-    // Clear date filter when navigating months — filter applies within current month only
-    document.getElementById('filter-date').value = '';
     updateMonthNavLabel();
     renderHistory();
   }
@@ -1463,7 +1434,6 @@
     updateMonthNavLabel();
 
     try {
-      const filterDate = document.getElementById('filter-date').value;
       // Load all entries sorted newest-first via IDB ts-index cursor
       let entries = await getMeasurementsSortedDesc();
 
@@ -1472,11 +1442,6 @@
         const d = new Date(e.ts);
         return d.getFullYear() === histViewMonth.year && d.getMonth() === histViewMonth.month;
       });
-
-      // If a specific date filter is active, narrow to that day only
-      if (filterDate) {
-        entries = entries.filter(e => localDateOf(e.ts) === filterDate);
-      }
 
       document.getElementById('count-label').textContent = `${entries.length} unosa`;
 
@@ -1645,14 +1610,6 @@
       console.error('[deleteEntry] Error:', err);
       showToast('Greška pri brisanju merenja!', true);
     }
-  }
-
-  /**
-   * Clears the active date filter and re-renders history for the full viewed month.
-   */
-  function clearHistFilter() {
-    document.getElementById('filter-date').value = '';
-    renderHistory();
   }
 
   // ── MED TOGGLE ──
